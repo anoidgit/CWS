@@ -1,16 +1,14 @@
+print("set default tensor type to float")
 torch.setdefaulttensortype('torch.FloatTensor')
 
 function gradUpdate(mlpin, x, y, criterionin, learningRate)
 	local pred=mlpin:forward(x)
 	local err=criterionin:forward(pred, y)
-	if err~=nan then
-		sumErr=sumErr+err
-	end
+	sumErr=sumErr+err
 	local gradCriterion=criterionin:backward(pred, y)
 	mlpin:zeroGradParameters()
-	local errback=mlpin:backward(x, gradCriterion)
+	mlpin:backward(x, gradCriterion)
 	mlpin:updateParameters(learningRate)
-	return errback
 end
 
 function loadseq(fname)
@@ -109,8 +107,7 @@ end
 print("load settings")
 winsize=5
 batchsize=1024
-modlr=0.000976562
-posibleminerr=0.001
+modlr=0.5
 
 print("load training data")
 trainseq=loadseq('datasrc/luamsrtrain.txt')
@@ -119,7 +116,7 @@ tarseq=loadseq('datasrc/luamsrtarget.txt')
 print("load vectors")
 wvec=ldtensor('datasrc/wvec.asc')
 
-cachesize=batchsize*2
+cachesize=batchsize*4
 
 nvec=(#wvec)[1]
 sizvec=(#wvec)[2]
@@ -151,6 +148,9 @@ nnmod=nn.Sequential()
 	:add(nn.Linear(winsize*sizvec,math.floor(winsize*sizvec*0.5)))
 	:add(nn.Tanh())
 	:add(nn.Linear(math.floor(winsize*sizvec*0.5),1))
+	:add(nn.Sigmoid())
+
+print(nnmod)
 
 print("design criterion")
 critmod = nn.BCECriterion()
@@ -191,9 +191,9 @@ while true do
 		erate=sumErr/totrain
 		print("epoch:"..tostring(epochs)..",lr:"..lr..",PPL:"..erate)
 		table.insert(crithis,erate)
-		if erate<minerrate then
+		if erate<minerrate and erate~=0 then
 			print("new minimal error found,save model")
-			minerrate=math.max(erate,posibleminerr)
+			minerrate=erate
 			file=torch.DiskFile("winrs/nnmod"..storemini..".asc",'w')
 			file:writeObject(anomlp)
 			file:close()
@@ -221,8 +221,6 @@ while true do
 	critensor=torch.Tensor(crithis)
 	file:writeObject(critensor)
 	file:close()
-
-	print("plot criterion history")
 
 	print("plot and save criterion")
 	gnuplot.plot(critensor)
