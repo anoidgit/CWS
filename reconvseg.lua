@@ -13,7 +13,7 @@ function gradUpdate(mlpin, x, y, criterionin, learningRate)
 	mlpin:maxParamNorm(-1)
 end
 
-function getresmodel(modelcap,scale)
+function getresmodel(modelcap,scale,usegraph)
 	local rtm=nn.ConcatTable()
 	rtm:add(modelcap)
 	if not scale or scale==1 then
@@ -23,7 +23,14 @@ function getresmodel(modelcap,scale)
 	else
 		rtm:add(nn.Sequential():add(nn.Identity()):add(scale))
 	end
-	return nn.Sequential():add(rtm):add(nn.CAddTable())
+	local rsmod=nn.Sequential():add(rtm):add(nn.CAddTable())
+	if usegraph then
+		local input=nn.Identity()()
+		local output=rsmod(input)
+		return nn.gModule({input},{output})
+	else
+		return rsmod
+	end
 end
 
 function loadseq(fname)
@@ -169,6 +176,7 @@ easytarseq()
 
 print("load packages")
 require "nn"
+require "nngraph"
 require "dpnn"
 require "vecLookup"
 require "gnuplot"
@@ -182,26 +190,26 @@ nnmod=nn.Sequential()
 	:add(nn.vecLookup(wvec))
 	:add(nn.Reshape(isize,true))
 	:add(nn.Linear(isize,mtsize))
-	:add(getresmodel(nn.Tanh(),0.125))
+	:add(getresmodel(nn.Tanh(),0.125,true))
 	:add(nn.Linear(mtsize,picsize))
-	:add(getresmodel(nn.Tanh(),0.125))
+	:add(getresmodel(nn.Tanh(),0.125,true))
 	:add(nn.Reshape(picdepth,picheight,picwidth,true))
 	:add(nn.SpatialConvolution(picdepth, nifilter, 3, 1))
-	:add(getresmodel(nn.Tanh(),0.125))
+	:add(getresmodel(nn.Tanh(),0.125,true))
 	:add(nn.SpatialConvolution(nifilter, nifilter, 1, 3))
-	:add(getresmodel(nn.Tanh(),0.125))
+	:add(getresmodel(nn.Tanh(),0.125,true))
 	:add(nn.SpatialConvolution(nifilter, nimfilter, 1, 1))
-	:add(getresmodel(nn.Tanh(),0.125))
+	:add(getresmodel(nn.Tanh(),0.125,true))
 	:add(nn.SpatialConvolution(nimfilter, nmfilter, 3, 1))
-	:add(getresmodel(nn.Tanh(),0.125))
+	:add(getresmodel(nn.Tanh(),0.125,true))
 	:add(nn.SpatialConvolution(nmfilter, nmfilter, 1, 3))
-	:add(getresmodel(nn.Tanh(),0.125))
+	:add(getresmodel(nn.Tanh(),0.125,true))
 	:add(nn.SpatialConvolution(nmfilter, nofilter, 1, 1))
-	:add(getresmodel(nn.Tanh(),0.125))
+	:add(getresmodel(nn.Tanh(),0.125,true))
 	:add(nn.SpatialConvolution(nofilter, nfmfilter, 3, 1))
-	:add(getresmodel(nn.Tanh(),0.125))
+	:add(getresmodel(nn.Tanh(),0.125,true))
 	:add(nn.SpatialConvolution(nfmfilter, nfmfilter, 1, 3))
-	:add(getresmodel(nn.Tanh(),0.125))
+	:add(getresmodel(nn.Tanh(),0.125,true))
 	:add(nn.SpatialConvolution(nfmfilter, nfofilter, 1, 1))
 	:add(nn.Reshape(cosize,true))
 	:add(nn.Tanh())
