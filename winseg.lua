@@ -203,7 +203,7 @@ while true do
 		if erate<minerrate and erate~=0 then
 			print("new minimal error found,save model")
 			minerrate=erate
-			saveObject("winrs/nnmod"..storemini..".asc",anomlp)
+			saveObject("winrs/nnmod"..storemini..".asc",nnmod)
 			storemini=storemini+1
 			aminerr=0
 		else
@@ -219,7 +219,7 @@ while true do
 	end
 
 	print("save neural network trained")
-	saveObject("winrs/nnmod.asc",anomlp)
+	saveObject("winrs/nnmod.asc",nnmod)
 
 	print("save criterion history trained")
 	critensor=torch.Tensor(crithis)
