@@ -154,11 +154,15 @@ require "gnuplot"
 print("design neural networks")
 isize=sizvec*winsize
 hsize=math.floor(isize*0.5)
+--hfsize=math.floor(hsize*0.5)
 nnmod=nn.Sequential()
 	:add(nn.vecLookup(wvec))
 	:add(nn.Reshape(isize,true))
 	:add(nn.Linear(isize,hsize))
 	:add(nn.Tanh())
+--	:add(nn.Linear(hsize,hfsize))
+--	:add(nn.Tanh())
+--	:add(nn.Linear(hfsize,1))
 	:add(nn.Linear(hsize,1))
 	:add(nn.Sigmoid())
 
