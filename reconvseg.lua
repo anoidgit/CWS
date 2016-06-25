@@ -132,8 +132,9 @@ modlr=0.5
 picwidth=5
 picheight=5
 picdepth=2
-nifilter=16
-nofilter=2
+nifilter=8
+nmfilter=16
+nofilter=8
 
 print("load training data")
 trainseq=loadseq('datasrc/luamsrtrain.txt')
@@ -172,7 +173,7 @@ require "gnuplot"
 print("design neural networks")
 isize=sizvec*winsize
 picsize=picdepth*picheight*picwidth
-cosize=nofilter*(picheight-2)*(picwidth-2)
+cosize=nofilter*(picheight-2-2)*(picwidth-2-2)
 nnmod=nn.Sequential()
 	:add(nn.vecLookup(wvec))
 	:add(nn.Reshape(isize,true))
@@ -183,8 +184,13 @@ nnmod=nn.Sequential()
 	:add(getresmodel(nn.Tanh(),0.125))
 	:add(nn.SpatialConvolution(nifilter, nifilter, 1, 3))
 	:add(getresmodel(nn.Tanh(),0.125))
-	:add(nn.SpatialConvolution(nifilter, nofilter, 1, 1))
+	:add(nn.SpatialConvolution(nifilter, nmfilter, 3, 1))
+	:add(getresmodel(nn.Tanh(),0.125))
+	:add(nn.SpatialConvolution(nmfilter, nmfilter, 1, 3))
+	:add(getresmodel(nn.Tanh(),0.125))
+	:add(nn.SpatialConvolution(nmfilter, nofilter, 1, 1))
 	:add(nn.Reshape(cosize,true))
+	:add(nn.Tanh())
 	:add(nn.Linear(cosize,1))
 	:add(nn.Sigmoid())
 
