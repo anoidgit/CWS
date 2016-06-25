@@ -33,6 +33,12 @@ function getresmodel(modelcap,scale,usegraph)
 	end
 end
 
+function graphmodule(module_graph)
+	local input=nn.Identity()()
+	local output=module_graph(input)
+	return nn.gModule({input},{output})
+end
+
 function loadseq(fname)
 	local file=io.open(fname)
 	local num=file:read("*n")
@@ -186,9 +192,10 @@ isize=sizvec*winsize
 picsize=picdepth*picheight*picwidth
 mtsize=math.floor((isize+picsize)/2)
 cosize=nfofilter*(picheight-2-2-2)*(picwidth-2-2-2)
-nnmod=nn.Sequential()
+nnmodinput=nn.Sequential()
 	:add(nn.vecLookup(wvec))
 	:add(nn.Reshape(isize,true))
+nnmodcore=graphmodule(nn.Sequential()
 	:add(nn.Linear(isize,mtsize))
 	:add(getresmodel(nn.Tanh(),0.125,true))
 	:add(nn.Linear(mtsize,picsize))
@@ -214,7 +221,11 @@ nnmod=nn.Sequential()
 	:add(nn.Reshape(cosize,true))
 	:add(nn.Tanh())
 	:add(nn.Linear(cosize,1))
-	:add(nn.Sigmoid())
+	:add(nn.Sigmoid()))
+
+nnmod=nn.Sequential()
+	:add(nnmodinput)
+	:add(nnmodcore)
 
 print(nnmod)
 
