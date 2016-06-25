@@ -13,6 +13,12 @@ function gradUpdate(mlpin, x, y, criterionin, learningRate)
 	mlpin:maxParamNorm(-1)
 end
 
+function graphmodule(module_graph)
+	local input=nn.Identity()()
+	local output=module_graph(input)
+	return nn.gModule({input},{output})
+end
+
 function loadseq(fname)
 	local file=io.open(fname)
 	local num=file:read("*n")
@@ -155,16 +161,21 @@ print("design neural networks")
 isize=sizvec*winsize
 hsize=math.floor(isize*0.5)
 --hfsize=math.floor(hsize*0.5)
-nnmod=nn.Sequential()
+nnmodinput=nn.Sequential()
 	:add(nn.vecLookup(wvec))
 	:add(nn.Reshape(isize,true))
+nnmodcore=graphmodule(nn.Sequential()
 	:add(nn.Linear(isize,hsize))
 	:add(nn.Tanh())
 --	:add(nn.Linear(hsize,hfsize))
 --	:add(nn.Tanh())
 --	:add(nn.Linear(hfsize,1))
 	:add(nn.Linear(hsize,1))
-	:add(nn.Sigmoid())
+	:add(nn.Sigmoid()))
+
+nnmod=nn.Sequential()
+	:add(nnmodinput)
+	:add(nnmodcore)
 
 print(nnmod)
 
