@@ -132,7 +132,8 @@ modlr=0.5
 picwidth=5
 picheight=5
 picdepth=4
-nifilter=16
+nifilter=32
+nimfilter=16
 nmfilter=32
 nofilter=16
 
@@ -184,7 +185,9 @@ nnmod=nn.Sequential()
 	:add(getresmodel(nn.Tanh(),0.125))
 	:add(nn.SpatialConvolution(nifilter, nifilter, 1, 3))
 	:add(getresmodel(nn.Tanh(),0.125))
-	:add(nn.SpatialConvolution(nifilter, nmfilter, 3, 1))
+	:add(nn.SpatialConvolution(nifilter, nimfilter, 1, 1))
+	:add(getresmodel(nn.Tanh(),0.125))
+	:add(nn.SpatialConvolution(nimfilter, nmfilter, 3, 1))
 	:add(getresmodel(nn.Tanh(),0.125))
 	:add(nn.SpatialConvolution(nmfilter, nmfilter, 1, 3))
 	:add(getresmodel(nn.Tanh(),0.125))
