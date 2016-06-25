@@ -176,11 +176,14 @@ require "gnuplot"
 print("design neural networks")
 isize=sizvec*winsize
 picsize=picdepth*picheight*picwidth
+mtsize=math.floor((isize+picsize)/2)
 cosize=nfofilter*(picheight-2-2-2)*(picwidth-2-2-2)
 nnmod=nn.Sequential()
 	:add(nn.vecLookup(wvec))
 	:add(nn.Reshape(isize,true))
-	:add(nn.Linear(isize,picsize))
+	:add(nn.Linear(isize,mtsize))
+	:add(getresmodel(nn.Tanh(),0.125))
+	:add(nn.Linear(mtsize,picsize))
 	:add(getresmodel(nn.Tanh(),0.125))
 	:add(nn.Reshape(picdepth,picheight,picwidth,true))
 	:add(nn.SpatialConvolution(picdepth, nifilter, 3, 1))
