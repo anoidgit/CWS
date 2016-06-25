@@ -8,7 +8,9 @@ function gradUpdate(mlpin, x, y, criterionin, learningRate)
 	local gradCriterion=criterionin:backward(pred, y)
 	mlpin:zeroGradParameters()
 	mlpin:backward(x, gradCriterion)
+	mlpin:updateGradParameters(0.875)
 	mlpin:updateParameters(learningRate)
+	mlpin:maxParamNorm(-1)
 end
 
 function loadseq(fname)
@@ -24,13 +26,6 @@ function loadseq(fname)
 		table.insert(rs,tmpt)
 		num=file:read("*n")
 	end
-	file:close()
-	return rs
-end
-
-function ldtensor(fname)
-	local file=torch.DiskFile(fname)
-	local rs=file:readObject()
 	file:close()
 	return rs
 end
@@ -104,8 +99,21 @@ function getsamples()
 	return torch.Tensor(inp),torch.Tensor(tar):resize(batchsize,1)
 end
 
+function loadObject(fname)
+	local file=torch.DiskFile(fname)
+	local objRd=file:readObject()
+	file:close()
+	return objRd
+end
+
+function saveObject(fname,objWrt)
+	local file=torch.DiskFile(fname,'w')
+	file:writeObject(objWrt)
+	file:close()
+end
+
 print("load settings")
-winsize=5
+winsize=7
 batchsize=1024
 modlr=0.5
 
@@ -114,7 +122,7 @@ trainseq=loadseq('datasrc/luamsrtrain.txt')
 tarseq=loadseq('datasrc/luamsrtarget.txt')
 
 print("load vectors")
-wvec=ldtensor('datasrc/wvec.asc')
+wvec=loadObject('datasrc/wvec.asc')
 
 cachesize=batchsize*4
 
@@ -131,23 +139,27 @@ storemini=1
 storenleg=1
 ieps=256
 totrain=ieps*batchsize
+minerrate=0.00035
 
 print("prefit train data")
 easytrainseq()
 easytarseq()
 
 print("load packages")
---require "nn"
+require "nn"
+require "dpnn"
 require "vecLookup"
 require "gnuplot"
 
 print("design neural networks")
+isize=sizvec*winsize
+hsize=math.floor(isize*0.5)
 nnmod=nn.Sequential()
 	:add(nn.vecLookup(wvec))
-	:add(nn.Reshape(winsize*sizvec,true))
-	:add(nn.Linear(winsize*sizvec,math.floor(winsize*sizvec*0.5)))
+	:add(nn.Reshape(isize,true))
+	:add(nn.Linear(isize,hsize))
 	:add(nn.Tanh())
-	:add(nn.Linear(math.floor(winsize*sizvec*0.5),1))
+	:add(nn.Linear(hsize,1))
 	:add(nn.Sigmoid())
 
 print(nnmod)
@@ -159,8 +171,8 @@ print("start train")
 epochs=1
 
 print("start pre train")
+lr=modlr
 for tmpi=1,32 do
-	lr=modlr
 	for tmpi=1,ieps do
 		input,target=getsamples(batchsize)
 		gradUpdate(nnmod,input,target,critmod,lr)
@@ -178,9 +190,6 @@ icycle=1
 aminerr=0
 lrdecayepochs=1
 
-netlr=netlearnrate
-veclr=veclearnrate
-
 while true do
 	print("start innercycle:"..icycle)
 	for innercycle=1,256 do
@@ -194,9 +203,7 @@ while true do
 		if erate<minerrate and erate~=0 then
 			print("new minimal error found,save model")
 			minerrate=erate
-			file=torch.DiskFile("winrs/nnmod"..storemini..".asc",'w')
-			file:writeObject(anomlp)
-			file:close()
+			saveObject("winrs/nnmod"..storemini..".asc",anomlp)
 			storemini=storemini+1
 			aminerr=0
 		else
@@ -212,15 +219,11 @@ while true do
 	end
 
 	print("save neural network trained")
-	file=torch.DiskFile("winrs/nnmod.asc",'w')
-	file:writeObject(anomlp)
-	file:close()
+	saveObject("winrs/nnmod.asc",anomlp)
 
 	print("save criterion history trained")
-	file=torch.DiskFile("winrs/crit.asc",'w')
 	critensor=torch.Tensor(crithis)
-	file:writeObject(critensor)
-	file:close()
+	saveObject("winrs/crit.asc",critensor)
 
 	print("plot and save criterion")
 	gnuplot.plot(critensor)
