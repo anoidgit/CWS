@@ -131,10 +131,10 @@ batchsize=1024
 modlr=0.5
 picwidth=5
 picheight=5
-picdepth=2
-nifilter=8
-nmfilter=16
-nofilter=8
+picdepth=4
+nifilter=16
+nmfilter=32
+nofilter=16
 
 print("load training data")
 trainseq=loadseq('datasrc/luamsrtrain.txt')
@@ -235,7 +235,7 @@ while true do
 		if erate<minerrate and erate~=0 then
 			print("new minimal error found,save model")
 			minerrate=erate
-			saveObject("reconvrs/nnmod"..storemini..".asc",anomlp)
+			saveObject("reconvrs/nnmod"..storemini..".asc",nnmod)
 			storemini=storemini+1
 			aminerr=0
 		else
@@ -251,7 +251,7 @@ while true do
 	end
 
 	print("save neural network trained")
-	saveObject("reconvrs/nnmod.asc",anomlp)
+	saveObject("reconvrs/nnmod.asc",nnmod)
 
 	print("save criterion history trained")
 	critensor=torch.Tensor(crithis)
