@@ -114,6 +114,7 @@ end
 
 function saveObject(fname,objWrt)
 	local file=torch.DiskFile(fname,'w')
+	objWrt:lightSerial()
 	file:writeObject(objWrt)
 	file:close()
 end
