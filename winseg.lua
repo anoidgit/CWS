@@ -159,24 +159,29 @@ require "vecLookup"
 require "gnuplot"
 
 print("design neural networks")
-isize=sizvec*winsize
-hsize=math.floor(isize*0.5)
---hfsize=math.floor(hsize*0.5)
-nnmodinput=nn.Sequential()
-	:add(nn.vecLookup(wvec))
-	:add(nn.Reshape(isize,true))
-nnmodcore=graphmodule(nn.Sequential()
-	:add(nn.Linear(isize,hsize))
-	:add(nn.Tanh())
---	:add(nn.Linear(hsize,hfsize))
---	:add(nn.Tanh())
---	:add(nn.Linear(hfsize,1))
-	:add(nn.Linear(hsize,1))
-	:add(nn.Sigmoid()))
+function getnn()
+	local isize=sizvec*winsize
+	local hsize=math.floor(isize*0.5)
+	--local hfsize=math.floor(hsize*0.5)
+	local nnmodinput=nn.Sequential()
+		:add(nn.vecLookup(wvec))
+		:add(nn.Reshape(isize,true))
+	local nnmodcore=graphmodule(nn.Sequential()
+		:add(nn.Linear(isize,hsize))
+		:add(nn.Tanh())
+	--	:add(nn.Linear(hsize,hfsize))
+	--	:add(nn.Tanh())
+	--	:add(nn.Linear(hfsize,1))
+		:add(nn.Linear(hsize,1))
+		:add(nn.Sigmoid()))
 
-nnmod=nn.Sequential()
-	:add(nnmodinput)
-	:add(nnmodcore)
+	local nnmod=nn.Sequential()
+		:add(nnmodinput)
+		:add(nnmodcore)
+	return nnmod
+end
+
+nnmod=getnn()
 
 print(nnmod)
 
