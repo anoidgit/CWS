@@ -153,6 +153,7 @@ easytarseq()
 
 print("load packages")
 require "nn"
+require "nngraph"
 require "dpnn"
 require "vecLookup"
 require "gnuplot"
