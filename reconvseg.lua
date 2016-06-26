@@ -134,6 +134,7 @@ end
 
 function saveObject(fname,objWrt)
 	local file=torch.DiskFile(fname,'w')
+	objWrt:lightSerial()
 	file:writeObject(objWrt)
 	file:close()
 end
@@ -220,7 +221,7 @@ function getnn()
 		:add(nn.SpatialConvolution(nfmfilter, nfmfilter, 1, 3))
 		:add(srtanh:clone())
 		:add(nn.SpatialConvolution(nfmfilter, nfofilter, 1, 1))
-		:add(nn.Reshape(cosize,true))
+		:add(nn.Collapse(2))
 		:add(nn.Tanh())
 		:add(nn.Linear(cosize,1))
 		:add(nn.Sigmoid()))
