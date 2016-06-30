@@ -14,8 +14,9 @@ function gradUpdate(mlpin, x, y, criterionin, learningRate)
 end
 
 function evaDev(mlpin, x, y, criterionin)
-	mlpin:evaluate()
-	return criterionin:forward(mlpin:forward(x), y)
+	local tmod=mlpin:clone()
+	tmod:evaluate()
+	return criterionin:forward(tmod:forward(x), y)
 end
 
 function getresmodel(modelcap,scale,usegraph)
@@ -145,9 +146,6 @@ function loadObject(fname)
 end
 
 function saveObject(fname,objWrt)
-	if not torch.isTensor(objWrt) then
-		objWrt:lightSerial()
-	end
 	local file=torch.DiskFile(fname,'w')
 	file:writeObject(objWrt)
 	file:close()
@@ -274,7 +272,6 @@ collectgarbage()
 
 print("start pre train")
 for tmpi=1,32 do
-	nnmod:training()
 	for tmpi=1,ieps do
 		input,target=getsamples(batchsize)
 		gradUpdate(nnmod,input,target,critmod,lr)
@@ -297,7 +294,6 @@ lrdecayepochs=1
 while true do
 	print("start innercycle:"..icycle)
 	for innercycle=1,256 do
-		nnmod:training()
 		for tmpi=1,ieps do
 			input,target=getsamples(batchsize)
 			gradUpdate(nnmod,input,target,critmod,lr)
