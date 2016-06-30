@@ -207,8 +207,6 @@ function getnn()
 	local nifilter=16
 
 	local nifilter2=nifilter*2
-	local nifilter4=nifilter2*2
-	local nifilter8=nifilter4*2
 
 	local isize=sizvec*winsize
 	local picsize=picdepth*picheight*picwidth
@@ -235,17 +233,19 @@ function getnn()
 		:add(srtanh:clone())
 		:add(nn.SpatialConvolution(nifilter, nifilter2, 3, 1))
 		:add(srtanh:clone())
-		:add(nn.SpatialConvolution(nifilter2, nifilter4, 1, 3))
+		:add(nn.SpatialConvolution(nifilter2, nifilter, 1, 1))
 		:add(srtanh:clone())
-		:add(nn.SpatialConvolution(nifilter4, nifilter2, 1, 1))
+		:add(nn.SpatialConvolution(nifilter, nifilter2, 1, 3))
 		:add(srtanh:clone())
-		:add(nn.SpatialConvolution(nifilter2, nifilter4, 3, 1))
+		:add(nn.SpatialConvolution(nifilter2, nifilter, 1, 1))
 		:add(srtanh:clone())
-		:add(nn.SpatialConvolution(nifilter4, nifilter2, 1, 1))
+		:add(nn.SpatialConvolution(nifilter, nifilter2, 3, 1))
 		:add(srtanh:clone())
-		:add(nn.SpatialConvolution(nifilter2, nifilter4, 1, 3))
+		:add(nn.SpatialConvolution(nifilter2, nifilter, 1, 1))
 		:add(srtanh:clone())
-		:add(nn.SpatialConvolution(nifilter4, nifilter2, 1, 1))
+		:add(nn.SpatialConvolution(nifilter, nifilter2, 1, 3))
+		:add(srtanh:clone())
+		:add(nn.SpatialConvolution(nifilter2, nifilter, 1, 1))
 		:add(nn.Convert('bchw','bf'))
 		:add(nn.Tanh())
 		:add(nn.Linear(cosize,1))
@@ -307,11 +307,21 @@ while true do
 		edevrate=evaDev(nnmod,devin,devt,critmod)
 		table.insert(cridev,edevrate)
 		print("epoch:"..tostring(epochs)..",lr:"..lr..",PPL:"..erate..",Dev:"..edevrate)
+		modsavd=false
+		if edevrate<mindeverrate then
+			print("new minimal dev error found,save model")
+			mindeverrate=edevrate
+			saveObject("reconvrs/devnnmod"..storedevmini..".asc",nnmod)
+			storedevmini=storedevmini+1
+			modsavd=true
+		end
 		if erate<minerrate then
-			print("new minimal error found,save model")
 			minerrate=erate
-			saveObject("reconvrs/nnmod"..storemini..".asc",nnmod)
-			storemini=storemini+1
+			print("new minimal error found,save model")
+			if not modsavd then
+				saveObject("reconvrs/nnmod"..storemini..".asc",nnmod)
+				storemini=storemini+1
+			end
 			aminerr=0
 		else
 			if aminerr>=4 then
@@ -320,12 +330,6 @@ while true do
 				lr=modlr/(lrdecayepochs)
 			end
 			aminerr=aminerr+1
-		end
-		if edevrate<mindeverrate then
-			print("new minimal dev error found,save model")
-			mindeverrate=edevrate
-			saveObject("reconvrs/devnnmod"..storedevmini..".asc",nnmod)
-			storedevmini=storedevmini+1
 		end
 		sumErr=0
 		epochs=epochs+1
