@@ -211,7 +211,7 @@ function getnn()
 	local isize=sizvec*winsize
 	local picsize=picdepth*picheight*picwidth
 	local mtsize=math.floor((isize+picsize)/2)
-	local cosize=nifilter2*(picheight-2-2-2)*(picwidth-2-2-2)
+	local cosize=nifilter*(picheight-2-2-2)*(picwidth-2-2-2)
 
 	local srtanh=getresmodel(nn.Tanh(),0.125,true)
 
