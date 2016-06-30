@@ -15,7 +15,7 @@ end
 
 function evaDev(mlpin, x, y, criterionin)
 	mlpin:evaluate()
-	return (criterionin:forward(mlpin:forward(x), y)/devsiz)
+	return criterionin:forward(mlpin:forward(x), y)
 end
 
 function getresmodel(modelcap,scale,usegraph)
@@ -134,8 +134,7 @@ function loadDev(inpf,tarf)
 			table.insert(devt,v)
 		end
 	end
-	devsiz=#devt
-	return torch.Tensor(devinp),torch.Tensor(devt):resize(devsiz,1)
+	return torch.Tensor(devinp),torch.Tensor(devt):resize(#devt,1)
 end
 
 function loadObject(fname)
@@ -186,9 +185,8 @@ erate=0
 edevrate=0
 storemini=1
 storedevmini=1
-minerrate=0.00035
-mindeverrate=0.00035
-totrain=ieps*batchsize
+minerrate=0.875
+mindeverrate=0.875
 
 print("load packages")
 require "nn"
@@ -247,7 +245,7 @@ function getnn()
 		:add(nn.Convert('bchw','bf'))
 		:add(nn.Tanh())
 		:add(nn.Linear(cosize,1))
-		:add(nn.Sigmoid())
+		--:add(nn.Sigmoid())
 
 	local nnmod=nn.Sequential()
 		:add(nnmodinput)
@@ -261,7 +259,9 @@ nnmod=getnn()
 print(nnmod)
 
 print("design criterion")
-critmod = nn.BCECriterion()
+critmod = nn.MarginCriterion()
+--if use the BCECriterion below, uncomment the Sigmoid activation funcition in getnn()
+--critmod = nn.BCECriterion()
 
 print("init train")
 epochs=1
@@ -275,7 +275,7 @@ for tmpi=1,32 do
 		input,target=getsamples(batchsize)
 		gradUpdate(nnmod,input,target,critmod,lr)
 	end
-	erate=sumErr/totrain
+	erate=sumErr/ieps
 	table.insert(crithis,erate)
 	edevrate=evaDev(nnmod,devin,devt,critmod)
 	table.insert(cridev,edevrate)
@@ -298,7 +298,7 @@ while true do
 			input,target=getsamples(batchsize)
 			gradUpdate(nnmod,input,target,critmod,lr)
 		end
-		erate=sumErr/totrain
+		erate=sumErr/ieps
 		table.insert(crithis,erate)
 		edevrate=evaDev(nnmod,devin,devt,critmod)
 		table.insert(cridev,edevrate)
