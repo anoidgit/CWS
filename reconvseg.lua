@@ -14,6 +14,7 @@ function gradUpdate(mlpin, x, y, criterionin, learningRate)
 end
 
 function evaDev(mlpin, x, y, criterionin)
+	mlpin:evaluate()
 	return (criterionin:forward(mlpin:forward(x), y)/devsiz)
 end
 
@@ -71,7 +72,7 @@ function easyinputseq(seqin)
 		for j=1,szadd do
 			table.insert(seqex,nvec)
 		end
-		for i,v in ipairs(seqin[i]) do
+		for _,v in ipairs(seqin[i]) do
 			table.insert(seqex,v)
 		end
 		for j=1,azadd do
@@ -87,7 +88,7 @@ function easytarseq(seqin)
 	local i=1
 	for i=1,#seqin do
 		table.remove(seqin[i],1)
-		table.insert(rst,torch.Tensor(seqin[i]))
+		table.insert(rst,seqin[i])
 	end
 	return rst
 end
@@ -99,9 +100,8 @@ function fillsamplecache()
 		for i=0,#seqex-winsize do
 			table.insert(samicache,{table.unpack(seqex,i+1,i+winsize)})
 		end
-		local ttar=tarseq[sid]
-		for i=1,(#ttar)[1] do
-			table.insert(samtcache,ttar[i])
+		for _,v in ipairs(tarseq[sid]) do
+			table.insert(samtcache,v)
 		end
 	end
 end
@@ -113,22 +113,15 @@ function getsamples()
 	local inp={}
 	local tar={}
 	for i=1,batchsize do
-		local inpu={}
-		local tmpi=table.remove(samicache,1)
-		for j=1,winsize do
-			table.insert(inpu,tmpi[j])
-		end
-		table.insert(inp,inpu)
+		table.insert(inp,table.remove(samicache,1))
 		table.insert(tar,table.remove(samtcache,1))
 	end
 	return torch.Tensor(inp),torch.Tensor(tar):resize(batchsize,1)
 end
 
 function loadDev(inpf,tarf)
-	local devseq=loadseq(inpf)
-	local devtar=loadseq(tarf)
-	devseq=easyinputseq(devseq)
-	devtar=easytarseq(devtar)
+	local devseq=easyinputseq(loadseq(inpf))
+	local devtar=easytarseq(loadseq(tarf))
 	local devinp={}
 	local devt={}
 	local seqid=1
@@ -137,9 +130,8 @@ function loadDev(inpf,tarf)
 		for i=0,#seqex-winsize do
 			table.insert(devinp,{table.unpack(seqex,i+1,i+winsize)})
 		end
-		local ttar=devtar[seqid]
-		for i=1,(#ttar)[1] do
-			table.insert(devt,ttar[i])
+		for _,v in ipairs(devtar[seqid]) do
+			table.insert(devt,v)
 		end
 	end
 	devsiz=#devt
@@ -154,9 +146,14 @@ function loadObject(fname)
 end
 
 function saveObject(fname,objWrt)
+	if objWrt:isTensor() then
+		local objLight=objWrt
+	else
+		local objLight=objWrt:clone()
+		objLight:lightSerial()
+	end
 	local file=torch.DiskFile(fname,'w')
-	objWrt:lightSerial()
-	file:writeObject(objWrt)
+	file:writeObject(objLight)
 	file:close()
 end
 
@@ -166,22 +163,24 @@ batchsize=1024
 ieps=256
 modlr=0.5
 
-print("load training data")
-trainseq=loadseq('datasrc/luatrain.txt')
-tarseq=loadseq('datasrc/luatarget.txt')
-
-devin,devt=loadDev('datasrc/luadevtrain.txt','datasrc/luadevtarget.txt')
-
 print("load vectors")
 wvec=loadObject('datasrc/wvec.asc')
 
-cachesize=batchsize*4
-
 nvec=(#wvec)[1]
 sizvec=(#wvec)[2]
+
+print("load training data")
+trainseq=easyinputseq(loadseq('datasrc/luatrain.txt'))
+tarseq=easytarseq(loadseq('datasrc/luatarget.txt'))
+
+devin,devt=loadDev('datasrc/luadevtrain.txt','datasrc/luadevtarget.txt')
+
+nsam=#trainseq
+
+cachesize=batchsize*4
+
 samicache={}
 samtcache={}
-nsam=#trainseq
 
 sumErr=0
 crithis={}
@@ -193,10 +192,6 @@ storedevmini=1
 minerrate=0.00035
 mindeverrate=0.00035
 totrain=ieps*batchsize
-
-print("prefit train data")
-trainseq=easyinputseq(trainseq)
-tarseq=easytarseq(tarseq)
 
 print("load packages")
 require "nn"
@@ -278,6 +273,7 @@ collectgarbage()
 
 print("start pre train")
 for tmpi=1,32 do
+	nnmod:training()
 	for tmpi=1,ieps do
 		input,target=getsamples(batchsize)
 		gradUpdate(nnmod,input,target,critmod,lr)
@@ -300,9 +296,10 @@ lrdecayepochs=1
 while true do
 	print("start innercycle:"..icycle)
 	for innercycle=1,256 do
+		nnmod:training()
 		for tmpi=1,ieps do
-		input,target=getsamples(batchsize)
-		gradUpdate(nnmod,input,target,critmod,lr)
+			input,target=getsamples(batchsize)
+			gradUpdate(nnmod,input,target,critmod,lr)
 		end
 		erate=sumErr/totrain
 		table.insert(crithis,erate)
@@ -339,20 +336,26 @@ while true do
 	print("save criterion history trained")
 	critensor=torch.Tensor(crithis)
 	saveObject("reconvrs/crit.asc",critensor)
+	critdev=torch.Tensor(cridev)
+	saveObject("reconvrs/critdev.asc",critdev)
 
 	print("plot and save criterion")
 	gnuplot.plot(critensor)
 	gnuplot.figprint("reconvrs/crit.png")
 	gnuplot.figprint("reconvrs/crit.eps")
 	gnuplot.plotflush()
+	gnuplot.plot(critdev)
+	gnuplot.figprint("reconvrs/critdev.png")
+	gnuplot.figprint("reconvrs/critdev.eps")
+	gnuplot.plotflush()
 
 	print("task finished!Minimal error rate:"..minerrate)
-
-	print("collect garbage")
-	collectgarbage()
 
 	print("wait for test, neural network saved at nnmod*.asc")
 
 	icycle=icycle+1
+
+	print("collect garbage")
+	collectgarbage()
 
 end
