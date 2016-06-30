@@ -316,13 +316,13 @@ while true do
 			modsavd=true
 		end
 		if erate<minerrate then
-			minerrate=erate
 			print("new minimal error found,save model")
+			minerrate=erate
+			aminerr=0
 			if not modsavd then
 				saveObject("reconvrs/nnmod"..storemini..".asc",nnmod)
 				storemini=storemini+1
 			end
-			aminerr=0
 		else
 			if aminerr>=4 then
 				aminerr=0
