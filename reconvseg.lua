@@ -146,14 +146,11 @@ function loadObject(fname)
 end
 
 function saveObject(fname,objWrt)
-	if objWrt:isTensor() then
-		local objLight=objWrt
-	else
-		local objLight=objWrt:clone()
-		objLight:lightSerial()
+	if not objWrt:isTensor() then
+		objWrt:lightSerial()
 	end
 	local file=torch.DiskFile(fname,'w')
-	file:writeObject(objLight)
+	file:writeObject(objWrt)
 	file:close()
 end
 
@@ -282,7 +279,7 @@ for tmpi=1,32 do
 	table.insert(crithis,erate)
 	edevrate=evaDev(nnmod,devin,devt,critmod)
 	table.insert(cridev,edevrate)
-	print("epoch:"..tostring(epochs)..",lr:"..lr..",PPL:"..erate",Dev:"..edevrate)
+	print("epoch:"..tostring(epochs)..",lr:"..lr..",PPL:"..erate..",Dev:"..edevrate)
 	sumErr=0
 	epochs=epochs+1
 end
@@ -305,7 +302,7 @@ while true do
 		table.insert(crithis,erate)
 		edevrate=evaDev(nnmod,devin,devt,critmod)
 		table.insert(cridev,edevrate)
-		print("epoch:"..tostring(epochs)..",lr:"..lr..",PPL:"..erate",Dev:"..edevrate)
+		print("epoch:"..tostring(epochs)..",lr:"..lr..",PPL:"..erate..",Dev:"..edevrate)
 		if erate<minerrate then
 			print("new minimal error found,save model")
 			minerrate=erate
