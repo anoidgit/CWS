@@ -167,9 +167,13 @@ sizvec=(#wvec)[2]
 
 print("load training data")
 trainseq=easyinputseq(loadseq('datasrc/luatrain.txt'))
-tarseq=easytarseq(loadseq('datasrc/luatarget.txt'))
+tarseq=easytarseq(loadseq('datasrc/luamartarget.txt'))
+--comment the above line and uncomment the line below if you use BCECriterion and Sigmoid who need 0 instead of -1.
+--tarseq=easytarseq(loadseq('datasrc/luatarget.txt'))
 
-devin,devt=loadDev('datasrc/luadevtrain.txt','datasrc/luadevtarget.txt')
+devin,devt=loadDev('datasrc/luadevtrain.txt','datasrc/luamardevtarget.txt')
+--comment the above line and uncomment the line below if you use BCECriterion and Sigmoid who need 0 instead of -1.
+--devin,devt=loadDev('datasrc/luadevtrain.txt','datasrc/luadevtarget.txt')
 
 nsam=#trainseq
 
@@ -260,7 +264,7 @@ print(nnmod)
 
 print("design criterion")
 critmod = nn.MarginCriterion()
---if use the BCECriterion below, uncomment the Sigmoid activation funcition in getnn()
+--if use the BCECriterion below, uncomment the Sigmoid activation funcition in getnn(), use another target dataset who is commented now where -1 is replaced by 0 for BCECriterion and Sigmoid.
 --critmod = nn.BCECriterion()
 
 print("init train")
