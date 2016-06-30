@@ -143,15 +143,6 @@ print("load settings")
 winsize=7
 batchsize=1024
 modlr=0.5
-picwidth=7
-picheight=7
-picdepth=4
-nifilter=16
-nimfilter=8
-nmfilter=32
-nofilter=16
-nfmfilter=32
-nfofilter=16
 
 print("load training data")
 trainseq=loadseq('datasrc/luamsrtrain.txt')
@@ -190,15 +181,27 @@ require "gnuplot"
 
 print("design neural networks")
 function getnn()
+	local picwidth=7
+	local picheight=7
+	local picdepth=4
+	local nifilter=16
+
+	local nifilter2=nifilter*2
+	local nifilter4=nifilter2*2
+	local nifilter8=nifilter4*2
+
 	local isize=sizvec*winsize
 	local picsize=picdepth*picheight*picwidth
 	local mtsize=math.floor((isize+picsize)/2)
-	local cosize=nfofilter*(picheight-2-2-2)*(picwidth-2-2-2)
+	local cosize=nifilter2*(picheight-2-2-2)*(picwidth-2-2-2)
+
 	local srtanh=getresmodel(nn.Tanh(),0.125,true)
+
 	local nnmodinput=nn.Sequential()
 		:add(nn.vecLookup(wvec))
 		:add(nn.Reshape(isize,true))
-	local nnmodcore=graphmodule(nn.Sequential()
+
+	local nnmodcore=nn.Sequential()
 		:add(nn.Linear(isize,mtsize))
 		:add(srtanh:clone())
 		:add(nn.Linear(mtsize,picsize))
@@ -206,29 +209,32 @@ function getnn()
 		:add(nn.Reshape(picdepth,picheight,picwidth,true))
 		:add(nn.SpatialConvolution(picdepth, nifilter, 3, 1))
 		:add(srtanh:clone())
-		:add(nn.SpatialConvolution(nifilter, nifilter, 1, 3))
+		:add(nn.SpatialConvolution(nifilter, nifilter2, 1, 3))
 		:add(srtanh:clone())
-		:add(nn.SpatialConvolution(nifilter, nimfilter, 1, 1))
+		:add(nn.SpatialConvolution(nifilter2, nifilter, 1, 1))
 		:add(srtanh:clone())
-		:add(nn.SpatialConvolution(nimfilter, nmfilter, 3, 1))
+		:add(nn.SpatialConvolution(nifilter, nifilter2, 3, 1))
 		:add(srtanh:clone())
-		:add(nn.SpatialConvolution(nmfilter, nmfilter, 1, 3))
+		:add(nn.SpatialConvolution(nifilter2, nifilter4, 1, 3))
 		:add(srtanh:clone())
-		:add(nn.SpatialConvolution(nmfilter, nofilter, 1, 1))
+		:add(nn.SpatialConvolution(nifilter4, nifilter2, 1, 1))
 		:add(srtanh:clone())
-		:add(nn.SpatialConvolution(nofilter, nfmfilter, 3, 1))
+		:add(nn.SpatialConvolution(nifilter2, nifilter4, 3, 1))
 		:add(srtanh:clone())
-		:add(nn.SpatialConvolution(nfmfilter, nfmfilter, 1, 3))
+		:add(nn.SpatialConvolution(nifilter4, nifilter2, 1, 1))
 		:add(srtanh:clone())
-		:add(nn.SpatialConvolution(nfmfilter, nfofilter, 1, 1))
+		:add(nn.SpatialConvolution(nifilter2, nifilter4, 1, 3))
+		:add(srtanh:clone())
+		:add(nn.SpatialConvolution(nifilter4, nifilter2, 1, 1))
 		:add(nn.Convert('bchw','bf'))
 		:add(nn.Tanh())
 		:add(nn.Linear(cosize,1))
-		:add(nn.Sigmoid()))
+		:add(nn.Sigmoid())
 
 	local nnmod=nn.Sequential()
 		:add(nnmodinput)
-		:add(nnmodcore)
+		:add(graphmodule(nnmodcore))
+
 	return nnmod
 end
 
@@ -239,11 +245,12 @@ print(nnmod)
 print("design criterion")
 critmod = nn.BCECriterion()
 
-print("start train")
+print("init train")
 epochs=1
+lr=modlr
+collectgarbage()
 
 print("start pre train")
-lr=modlr
 for tmpi=1,32 do
 	for tmpi=1,ieps do
 		input,target=getsamples(batchsize)
