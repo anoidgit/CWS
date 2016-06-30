@@ -13,6 +13,10 @@ function gradUpdate(mlpin, x, y, criterionin, learningRate)
 	mlpin:maxParamNorm(-1)
 end
 
+function evaDev(mlpin, x, y, criterionin)
+	return (criterionin:forward(mlpin:forward(x), y)/devsiz)
+end
+
 function getresmodel(modelcap,scale,usegraph)
 	local rtm=nn.ConcatTable()
 	rtm:add(modelcap)
@@ -56,18 +60,18 @@ function loadseq(fname)
 	return rs
 end
 
-function easytrainseq()
+function easyinputseq(seqin)
 	local azadd=math.floor(winsize/2)
 	local szadd=azadd-1
 	local rst={}
 	local i=1
-	for i=1,nsam do
+	for i=1,#seqin do
 		local seqex={}
 		local j=1
 		for j=1,szadd do
 			table.insert(seqex,nvec)
 		end
-		for i,v in ipairs(trainseq[i]) do
+		for i,v in ipairs(seqin[i]) do
 			table.insert(seqex,v)
 		end
 		for j=1,azadd do
@@ -75,17 +79,17 @@ function easytrainseq()
 		end
 		table.insert(rst,seqex)
 	end
-	trainseq=rst
+	return rst
 end
 
-function easytarseq()
+function easytarseq(seqin)
 	local rst={}
 	local i=1
-	for i=1,#tarseq do
-		table.remove(tarseq[i],1)
-		table.insert(rst,torch.Tensor(tarseq[i]))
+	for i=1,#seqin do
+		table.remove(seqin[i],1)
+		table.insert(rst,torch.Tensor(seqin[i]))
 	end
-	tarseq=rst
+	return rst
 end
 
 function fillsamplecache()
@@ -93,12 +97,7 @@ function fillsamplecache()
 		local sid=torch.random(1,nsam)
 		local seqex=trainseq[sid]
 		for i=0,#seqex-winsize do
-			local tmptable={}
-			local j=1
-			for j=1,winsize do
-				table.insert(tmptable,seqex[i+j])
-			end
-			table.insert(samicache,torch.Tensor(tmptable))
+			table.insert(samicache,{table.unpack(seqex,i+1,i+winsize)})
 		end
 		local ttar=tarseq[sid]
 		for i=1,(#ttar)[1] do
@@ -125,6 +124,28 @@ function getsamples()
 	return torch.Tensor(inp),torch.Tensor(tar):resize(batchsize,1)
 end
 
+function loadDev(inpf,tarf)
+	local devseq=loadseq(inpf)
+	local devtar=loadseq(tarf)
+	devseq=easyinputseq(devseq)
+	devtar=easytarseq(devtar)
+	local devinp={}
+	local devt={}
+	local seqid=1
+	for seqid=1,#devseq do
+		local seqex=devseq[seqid]
+		for i=0,#seqex-winsize do
+			table.insert(devinp,{table.unpack(seqex,i+1,i+winsize)})
+		end
+		local ttar=devtar[seqid]
+		for i=1,(#ttar)[1] do
+			table.insert(devt,ttar[i])
+		end
+	end
+	devsiz=#devt
+	return torch.Tensor(devinp),torch.Tensor(devt):resize(devsiz,1)
+end
+
 function loadObject(fname)
 	local file=torch.DiskFile(fname)
 	local objRd=file:readObject()
@@ -142,11 +163,14 @@ end
 print("load settings")
 winsize=7
 batchsize=1024
+ieps=256
 modlr=0.5
 
 print("load training data")
-trainseq=loadseq('datasrc/luamsrtrain.txt')
-tarseq=loadseq('datasrc/luamsrtarget.txt')
+trainseq=loadseq('datasrc/luatrain.txt')
+tarseq=loadseq('datasrc/luatarget.txt')
+
+devin,devt=loadDev('datasrc/luadevtrain.txt','datasrc/luadevtarget.txt')
 
 print("load vectors")
 wvec=loadObject('datasrc/wvec.asc')
@@ -161,16 +185,18 @@ nsam=#trainseq
 
 sumErr=0
 crithis={}
+cridev={}
 erate=0
+edevrate=0
 storemini=1
-storenleg=1
-ieps=256
-totrain=ieps*batchsize
+storedevmini=1
 minerrate=0.00035
+mindeverrate=0.00035
+totrain=ieps*batchsize
 
 print("prefit train data")
-easytrainseq()
-easytarseq()
+trainseq=easyinputseq(trainseq)
+tarseq=easytarseq(tarseq)
 
 print("load packages")
 require "nn"
@@ -257,8 +283,10 @@ for tmpi=1,32 do
 		gradUpdate(nnmod,input,target,critmod,lr)
 	end
 	erate=sumErr/totrain
-	print("epoch:"..tostring(epochs)..",lr:"..lr..",PPL:"..erate)
 	table.insert(crithis,erate)
+	edevrate=evaDev(nnmod,devin,devt,critmod)
+	table.insert(cridev,edevrate)
+	print("epoch:"..tostring(epochs)..",lr:"..lr..",PPL:"..erate",Dev:"..edevrate)
 	sumErr=0
 	epochs=epochs+1
 end
@@ -277,9 +305,11 @@ while true do
 		gradUpdate(nnmod,input,target,critmod,lr)
 		end
 		erate=sumErr/totrain
-		print("epoch:"..tostring(epochs)..",lr:"..lr..",PPL:"..erate)
 		table.insert(crithis,erate)
-		if erate<minerrate and erate~=0 then
+		edevrate=evaDev(nnmod,devin,devt,critmod)
+		table.insert(cridev,edevrate)
+		print("epoch:"..tostring(epochs)..",lr:"..lr..",PPL:"..erate",Dev:"..edevrate)
+		if erate<minerrate then
 			print("new minimal error found,save model")
 			minerrate=erate
 			saveObject("reconvrs/nnmod"..storemini..".asc",nnmod)
@@ -292,6 +322,12 @@ while true do
 				lr=modlr/(lrdecayepochs)
 			end
 			aminerr=aminerr+1
+		end
+		if edevrate<mindeverrate then
+			print("new minimal dev error found,save model")
+			mindeverrate=edevrate
+			saveObject("reconvrs/devnnmod"..storedevmini..".asc",nnmod)
+			storedevmini=storedevmini+1
 		end
 		sumErr=0
 		epochs=epochs+1
