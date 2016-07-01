@@ -190,8 +190,8 @@ erate=0
 edevrate=0
 storemini=1
 storedevmini=1
-minerrate=0.875
-mindeverrate=0.875
+minerrate=0.5
+mindeverrate=0.5
 
 print("load packages")
 require "nn"
@@ -214,9 +214,9 @@ function getnn()
 	local mtsize=math.floor((isize+picsize)/2)
 	local cosize=nifilter*(picheight-2-2-2)*(picwidth-2-2-2)
 
-	-- use ELU or residue-tanh? It is a problem, ELU runs faster now, so ELU
-	local actfunc=nn.ELU()
-	--local actfunc=getresmodel(nn.Tanh(),0.125,true)
+	-- use ELU or residue-tanh? It is a problem, ELU runs faster now, but may have problems
+	--local actfunc=nn.ELU()
+	local actfunc=getresmodel(nn.Tanh(),0.125,true)
 
 	local nnmodinput=nn.Sequential()
 		:add(nn.vecLookup(wvec))
@@ -279,7 +279,7 @@ lr=modlr
 collectgarbage()
 
 print("start pre train")
-for tmpi=1,32 do
+for tmpi=1,16 do
 	for tmpi=1,ieps do
 		input,target=getsamples(batchsize)
 		gradUpdate(nnmod,input,target,critmod,lr)
@@ -288,7 +288,7 @@ for tmpi=1,32 do
 	table.insert(crithis,erate)
 	edevrate=evaDev(nnmod,devin,devt,critmod)
 	table.insert(cridev,edevrate)
-	print("epoch:"..tostring(epochs)..",lr:"..lr..",PPL:"..erate..",Dev:"..edevrate)
+	print("epoch:"..tostring(epochs)..",lr:"..lr..",Tra:"..erate..",Dev:"..edevrate)
 	sumErr=0
 	epochs=epochs+1
 end
@@ -310,7 +310,7 @@ while true do
 		table.insert(crithis,erate)
 		edevrate=evaDev(nnmod,devin,devt,critmod)
 		table.insert(cridev,edevrate)
-		print("epoch:"..tostring(epochs)..",lr:"..lr..",PPL:"..erate..",Dev:"..edevrate)
+		print("epoch:"..tostring(epochs)..",lr:"..lr..",Tra:"..erate..",Dev:"..edevrate)
 		modsavd=false
 		if edevrate<mindeverrate then
 			print("new minimal dev error found,save model")
