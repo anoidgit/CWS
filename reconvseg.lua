@@ -178,7 +178,7 @@ devin,devt=loadDev('datasrc/luadevtrain.txt','datasrc/luamardevtarget.txt')
 
 nsam=#trainseq
 
-cachesize=batchsize*4
+cachesize=batchsize*8
 
 samicache={}
 samtcache={}
@@ -190,8 +190,8 @@ erate=0
 edevrate=0
 storemini=1
 storedevmini=1
-minerrate=0.5
-mindeverrate=0.5
+minerrate=1
+mindeverrate=minerrate
 
 print("load packages")
 require "nn"
@@ -279,16 +279,17 @@ lr=modlr
 collectgarbage()
 
 print("start pre train")
-for tmpi=1,16 do
+for tmpi=1,32 do
 	for tmpi=1,ieps do
 		input,target=getsamples(batchsize)
 		gradUpdate(nnmod,input,target,critmod,lr)
 	end
 	erate=sumErr/ieps
 	table.insert(crithis,erate)
-	edevrate=evaDev(nnmod,devin,devt,critmod)
-	table.insert(cridev,edevrate)
-	print("epoch:"..tostring(epochs)..",lr:"..lr..",Tra:"..erate..",Dev:"..edevrate)
+	--edevrate=evaDev(nnmod,devin,devt,critmod)
+	--table.insert(cridev,edevrate)
+	--print("epoch:"..tostring(epochs)..",lr:"..lr..",Tra:"..erate..",Dev:"..edevrate)
+	print("epoch:"..tostring(epochs)..",lr:"..lr..",Tra:"..erate)
 	sumErr=0
 	epochs=epochs+1
 end
@@ -320,10 +321,10 @@ while true do
 			modsavd=true
 		end
 		if erate<minerrate then
-			print("new minimal error found,save model")
 			minerrate=erate
 			aminerr=0
 			if not modsavd then
+				print("new minimal error found,save model")
 				saveObject("reconvrs/nnmod"..storemini..".asc",nnmod)
 				storemini=storemini+1
 			end
