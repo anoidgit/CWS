@@ -156,8 +156,8 @@ end
 
 print("load settings")
 winsize=11
-batchsize=2048
-ieps=128
+batchsize=4096
+ieps=64
 modlr=0.5
 
 print("load vectors")
