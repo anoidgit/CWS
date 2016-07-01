@@ -155,9 +155,9 @@ function saveObject(fname,objWrt)
 end
 
 print("load settings")
-winsize=11
-batchsize=4096
-ieps=64
+winsize=7
+batchsize=1024
+ieps=256
 modlr=0.5
 
 print("load vectors")
@@ -178,7 +178,7 @@ devin,devt=loadDev('datasrc/luadevtrain.txt','datasrc/luamardevtarget.txt')
 
 nsam=#trainseq
 
-cachesize=batchsize*math.floor(16384/batchsize)
+cachesize=batchsize*4
 
 samicache={}
 samtcache={}
@@ -190,8 +190,8 @@ erate=0
 edevrate=0
 storemini=1
 storedevmini=1
-minerrate=0.5
-mindeverrate=0.5
+minerrate=0.875
+mindeverrate=0.875
 
 print("load packages")
 require "nn"
@@ -202,9 +202,8 @@ require "gnuplot"
 
 print("design neural networks")
 function getnn()
-	--if you do not use the MaxPooling, take care of width height and parameters it affect like cosize
-	local picwidth=14
-	local picheight=14
+	local picwidth=7
+	local picheight=7
 	local picdepth=4
 	local nifilter=16
 
@@ -213,7 +212,7 @@ function getnn()
 	local isize=sizvec*winsize
 	local picsize=picdepth*picheight*picwidth
 	local mtsize=math.floor((isize+picsize)/2)
-	local cosize=nifilter*(math.floor(picheight/2)-2-2-2)*(math.floor(picwidth/2)-2-2-2)
+	local cosize=nifilter*(picheight-2-2-2)*(picwidth-2-2-2)
 
 	-- use ELU or residue-tanh? It is a problem, ELU runs faster now, so ELU
 	local actfunc=nn.ELU()
@@ -227,9 +226,8 @@ function getnn()
 		:add(nn.Linear(isize,mtsize))
 		:add(actfunc:clone())
 		:add(nn.Linear(mtsize,picsize))
-		--:add(actfunc:clone())
+		:add(actfunc:clone())
 		:add(nn.Reshape(picdepth,picheight,picwidth,true))
-		:add(nn.SpatialMaxPooling(2, 2, 2, 2))
 		:add(nn.SpatialConvolution(picdepth, nifilter, 3, 1))
 		:add(actfunc:clone())
 		:add(nn.SpatialConvolution(nifilter, nifilter2, 1, 3))
@@ -290,7 +288,7 @@ for tmpi=1,32 do
 	table.insert(crithis,erate)
 	edevrate=evaDev(nnmod,devin,devt,critmod)
 	table.insert(cridev,edevrate)
-	print("epoch:"..tostring(epochs)..",lr:"..lr..",Tra:"..erate..",Dev:"..edevrate)
+	print("epoch:"..tostring(epochs)..",lr:"..lr..",PPL:"..erate..",Dev:"..edevrate)
 	sumErr=0
 	epochs=epochs+1
 end
@@ -312,7 +310,7 @@ while true do
 		table.insert(crithis,erate)
 		edevrate=evaDev(nnmod,devin,devt,critmod)
 		table.insert(cridev,edevrate)
-		print("epoch:"..tostring(epochs)..",lr:"..lr..",Tra:"..erate..",Dev:"..edevrate)
+		print("epoch:"..tostring(epochs)..",lr:"..lr..",PPL:"..erate..",Dev:"..edevrate)
 		modsavd=false
 		if edevrate<mindeverrate then
 			print("new minimal dev error found,save model")
@@ -322,10 +320,10 @@ while true do
 			modsavd=true
 		end
 		if erate<minerrate then
+			print("new minimal error found,save model")
 			minerrate=erate
 			aminerr=0
 			if not modsavd then
-				print("new minimal error found,save model")
 				saveObject("reconvrs/nnmod"..storemini..".asc",nnmod)
 				storemini=storemini+1
 			end
