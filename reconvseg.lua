@@ -157,7 +157,7 @@ end
 print("load settings")
 winsize=11
 batchsize=512
-ieps=256
+ieps=512
 modlr=0.5
 
 print("load vectors")
@@ -202,6 +202,7 @@ require "gnuplot"
 
 print("design neural networks")
 function getnn()
+	--if you do not use the MaxPooling, take care of width height and parameters it affect like cosize
 	local picwidth=14
 	local picheight=14
 	local picdepth=4
@@ -212,9 +213,9 @@ function getnn()
 	local isize=sizvec*winsize
 	local picsize=picdepth*picheight*picwidth
 	local mtsize=math.floor((isize+picsize)/2)
-	local cosize=nifilter*(picheight-2-2-2)*(picwidth-2-2-2)
+	local cosize=nifilter*(math.floor(picheight/2)-2-2-2)*(math.floor(picwidth/2)-2-2-2)
 
-	-- use ELU or residue-tanh? It is a problem
+	-- use ELU or residue-tanh? It is a problem, ELU runs faster now, so ELU
 	local actfunc=nn.ELU()
 	--local actfunc=getresmodel(nn.Tanh(),0.125,true)
 
