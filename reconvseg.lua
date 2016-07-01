@@ -152,8 +152,8 @@ function saveObject(fname,objWrt)
 end
 
 print("load settings")
-winsize=7
-batchsize=1024
+winsize=11
+batchsize=512
 ieps=256
 modlr=0.5
 
@@ -175,7 +175,7 @@ devin,devt=loadDev('datasrc/luadevtrain.txt','datasrc/luamardevtarget.txt')
 
 nsam=#trainseq
 
-cachesize=batchsize*4
+cachesize=batchsize*math.floor(4096/batchsize)
 
 samicache={}
 samtcache={}
@@ -187,8 +187,8 @@ erate=0
 edevrate=0
 storemini=1
 storedevmini=1
-minerrate=0.875
-mindeverrate=0.875
+minerrate=0.5
+mindeverrate=0.5
 
 print("load packages")
 require "nn"
@@ -199,8 +199,8 @@ require "gnuplot"
 
 print("design neural networks")
 function getnn()
-	local picwidth=7
-	local picheight=7
+	local picwidth=14
+	local picheight=14
 	local picdepth=4
 	local nifilter=16
 
@@ -223,6 +223,7 @@ function getnn()
 		:add(nn.Linear(mtsize,picsize))
 		:add(srtanh:clone())
 		:add(nn.Reshape(picdepth,picheight,picwidth,true))
+		:add(nn.SpatialMaxPooling(2, 2, 2, 2))
 		:add(nn.SpatialConvolution(picdepth, nifilter, 3, 1))
 		:add(srtanh:clone())
 		:add(nn.SpatialConvolution(nifilter, nifilter2, 1, 3))
@@ -244,6 +245,8 @@ function getnn()
 		:add(nn.SpatialConvolution(nifilter, nifilter2, 1, 3))
 		:add(srtanh:clone())
 		:add(nn.SpatialConvolution(nifilter2, nifilter, 1, 1))
+
+	local nnmodoutput=nn.Sequential()
 		:add(nn.Convert('bchw','bf'))
 		:add(nn.Tanh())
 		:add(nn.Linear(cosize,1))
@@ -252,6 +255,7 @@ function getnn()
 	local nnmod=nn.Sequential()
 		:add(nnmodinput)
 		:add(graphmodule(nnmodcore))
+		:add(nnmodoutput)
 
 	return nnmod
 end
@@ -280,7 +284,7 @@ for tmpi=1,32 do
 	table.insert(crithis,erate)
 	edevrate=evaDev(nnmod,devin,devt,critmod)
 	table.insert(cridev,edevrate)
-	print("epoch:"..tostring(epochs)..",lr:"..lr..",PPL:"..erate..",Dev:"..edevrate)
+	print("epoch:"..tostring(epochs)..",lr:"..lr..",Tra:"..erate..",Dev:"..edevrate)
 	sumErr=0
 	epochs=epochs+1
 end
@@ -302,7 +306,7 @@ while true do
 		table.insert(crithis,erate)
 		edevrate=evaDev(nnmod,devin,devt,critmod)
 		table.insert(cridev,edevrate)
-		print("epoch:"..tostring(epochs)..",lr:"..lr..",PPL:"..erate..",Dev:"..edevrate)
+		print("epoch:"..tostring(epochs)..",lr:"..lr..",Tra:"..erate..",Dev:"..edevrate)
 		modsavd=false
 		if edevrate<mindeverrate then
 			print("new minimal dev error found,save model")
