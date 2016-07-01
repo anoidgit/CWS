@@ -156,8 +156,8 @@ end
 
 print("load settings")
 winsize=11
-batchsize=512
-ieps=512
+batchsize=1024
+ieps=256
 modlr=0.5
 
 print("load vectors")
@@ -178,7 +178,7 @@ devin,devt=loadDev('datasrc/luadevtrain.txt','datasrc/luamardevtarget.txt')
 
 nsam=#trainseq
 
-cachesize=batchsize*math.floor(4096/batchsize)
+cachesize=batchsize*math.floor(8192/batchsize)
 
 samicache={}
 samtcache={}
