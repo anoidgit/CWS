@@ -146,6 +146,9 @@ function loadObject(fname)
 end
 
 function saveObject(fname,objWrt)
+	if not torch.isTensor(objWrt) then
+		objWrt:lightSerial()
+	end
 	local file=torch.DiskFile(fname,'w')
 	file:writeObject(objWrt)
 	file:close()
