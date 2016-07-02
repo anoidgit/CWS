@@ -13,6 +13,32 @@ function gradUpdate(mlpin, x, y, criterionin, learningRate)
 	mlpin:maxParamNorm(-1)
 end
 
+function evaDev(mlpin, x, y, criterionin)
+	local tmod=mlpin:clone()
+	tmod:evaluate()
+	return criterionin:forward(tmod:forward(x), y)
+end
+
+function getresmodel(modelcap,scale,usegraph)
+	local rtm=nn.ConcatTable()
+	rtm:add(modelcap)
+	if not scale or scale==1 then
+		rtm:add(nn.Identity())
+	elseif type(scale)=='number' then
+		rtm:add(nn.Sequential():add(nn.Identity()):add(nn.MulConstant(scale,true)))
+	else
+		rtm:add(nn.Sequential():add(nn.Identity()):add(scale))
+	end
+	local rsmod=nn.Sequential():add(rtm):add(nn.CAddTable())
+	if usegraph then
+		local input=nn.Identity()()
+		local output=rsmod(input)
+		return nn.gModule({input},{output})
+	else
+		return rsmod
+	end
+end
+
 function graphmodule(module_graph)
 	local input=nn.Identity()()
 	local output=module_graph(input)
@@ -36,18 +62,18 @@ function loadseq(fname)
 	return rs
 end
 
-function easytrainseq()
+function easyinputseq(seqin)
 	local azadd=math.floor(winsize/2)
 	local szadd=azadd-1
 	local rst={}
 	local i=1
-	for i=1,nsam do
+	for i=1,#seqin do
 		local seqex={}
 		local j=1
 		for j=1,szadd do
 			table.insert(seqex,nvec)
 		end
-		for i,v in ipairs(trainseq[i]) do
+		for _,v in ipairs(seqin[i]) do
 			table.insert(seqex,v)
 		end
 		for j=1,azadd do
@@ -55,17 +81,17 @@ function easytrainseq()
 		end
 		table.insert(rst,seqex)
 	end
-	trainseq=rst
+	return rst
 end
 
-function easytarseq()
+function easytarseq(seqin)
 	local rst={}
 	local i=1
-	for i=1,#tarseq do
-		table.remove(tarseq[i],1)
-		table.insert(rst,torch.Tensor(tarseq[i]))
+	for i=1,#seqin do
+		table.remove(seqin[i],1)
+		table.insert(rst,seqin[i])
 	end
-	tarseq=rst
+	return rst
 end
 
 function fillsamplecache()
@@ -73,16 +99,10 @@ function fillsamplecache()
 		local sid=torch.random(1,nsam)
 		local seqex=trainseq[sid]
 		for i=0,#seqex-winsize do
-			local tmptable={}
-			local j=1
-			for j=1,winsize do
-				table.insert(tmptable,seqex[i+j])
-			end
-			table.insert(samicache,torch.Tensor(tmptable))
+			table.insert(samicache,{table.unpack(seqex,i+1,i+winsize)})
 		end
-		local ttar=tarseq[sid]
-		for i=1,(#ttar)[1] do
-			table.insert(samtcache,ttar[i])
+		for _,v in ipairs(tarseq[sid]) do
+			table.insert(samtcache,v)
 		end
 	end
 end
@@ -94,15 +114,28 @@ function getsamples()
 	local inp={}
 	local tar={}
 	for i=1,batchsize do
-		local inpu={}
-		local tmpi=table.remove(samicache,1)
-		for j=1,winsize do
-			table.insert(inpu,tmpi[j])
-		end
-		table.insert(inp,inpu)
+		table.insert(inp,table.remove(samicache,1))
 		table.insert(tar,table.remove(samtcache,1))
 	end
 	return torch.Tensor(inp),torch.Tensor(tar):resize(batchsize,1)
+end
+
+function loadDev(inpf,tarf)
+	local devseq=easyinputseq(loadseq(inpf))
+	local devtar=easytarseq(loadseq(tarf))
+	local devinp={}
+	local devt={}
+	local seqid=1
+	for seqid=1,#devseq do
+		local seqex=devseq[seqid]
+		for i=0,#seqex-winsize do
+			table.insert(devinp,{table.unpack(seqex,i+1,i+winsize)})
+		end
+		for _,v in ipairs(devtar[seqid]) do
+			table.insert(devt,v)
+		end
+	end
+	return torch.Tensor(devinp),torch.Tensor(devt):resize(#devt,1)
 end
 
 function loadObject(fname)
@@ -113,8 +146,10 @@ function loadObject(fname)
 end
 
 function saveObject(fname,objWrt)
+	if not torch.isTensor(objWrt) then
+		objWrt:lightSerial()
+	end
 	local file=torch.DiskFile(fname,'w')
-	objWrt:lightSerial()
 	file:writeObject(objWrt)
 	file:close()
 end
@@ -122,35 +157,41 @@ end
 print("load settings")
 winsize=7
 batchsize=1024
+ieps=256
 modlr=0.5
-
-print("load training data")
-trainseq=loadseq('datasrc/luamsrtrain.txt')
-tarseq=loadseq('datasrc/luamsrtarget.txt')
 
 print("load vectors")
 wvec=loadObject('datasrc/wvec.asc')
 
-cachesize=batchsize*4
-
 nvec=(#wvec)[1]
 sizvec=(#wvec)[2]
+
+print("load training data")
+trainseq=easyinputseq(loadseq('datasrc/luatrain.txt'))
+tarseq=easytarseq(loadseq('datasrc/luamartarget.txt'))
+--comment the above line and uncomment the line below if you use BCECriterion and Sigmoid who need 0 instead of -1.
+--tarseq=easytarseq(loadseq('datasrc/luatarget.txt'))
+
+devin,devt=loadDev('datasrc/luadevtrain.txt','datasrc/luamardevtarget.txt')
+--comment the above line and uncomment the line below if you use BCECriterion and Sigmoid who need 0 instead of -1.
+--devin,devt=loadDev('datasrc/luadevtrain.txt','datasrc/luadevtarget.txt')
+
+nsam=#trainseq
+
+cachesize=batchsize*8
+
 samicache={}
 samtcache={}
-nsam=#trainseq
 
 sumErr=0
 crithis={}
+cridev={}
 erate=0
+edevrate=0
 storemini=1
-storenleg=1
-ieps=256
-totrain=ieps*batchsize
-minerrate=0.00035
-
-print("prefit train data")
-easytrainseq()
-easytarseq()
+storedevmini=1
+minerrate=1
+mindeverrate=minerrate
 
 print("load packages")
 require "nn"
@@ -187,21 +228,27 @@ nnmod=getnn()
 print(nnmod)
 
 print("design criterion")
-critmod = nn.BCECriterion()
+critmod = nn.MarginCriterion()
+--if use the BCECriterion below, uncomment the Sigmoid activation funcition in getnn(), use another target dataset who is commented now where -1 is replaced by 0 for BCECriterion and Sigmoid.
+--critmod = nn.BCECriterion()
 
-print("start train")
+print("init train")
 epochs=1
+lr=modlr
+collectgarbage()
 
 print("start pre train")
-lr=modlr
 for tmpi=1,32 do
 	for tmpi=1,ieps do
 		input,target=getsamples(batchsize)
 		gradUpdate(nnmod,input,target,critmod,lr)
 	end
-	erate=sumErr/totrain
-	print("epoch:"..tostring(epochs)..",lr:"..lr..",PPL:"..erate)
+	erate=sumErr/ieps
 	table.insert(crithis,erate)
+	--edevrate=evaDev(nnmod,devin,devt,critmod)
+	--table.insert(cridev,edevrate)
+	--print("epoch:"..tostring(epochs)..",lr:"..lr..",Tra:"..erate..",Dev:"..edevrate)
+	print("epoch:"..tostring(epochs)..",lr:"..lr..",Tra:"..erate)
 	sumErr=0
 	epochs=epochs+1
 end
@@ -216,18 +263,30 @@ while true do
 	print("start innercycle:"..icycle)
 	for innercycle=1,256 do
 		for tmpi=1,ieps do
-		input,target=getsamples(batchsize)
-		gradUpdate(nnmod,input,target,critmod,lr)
+			input,target=getsamples(batchsize)
+			gradUpdate(nnmod,input,target,critmod,lr)
 		end
-		erate=sumErr/totrain
-		print("epoch:"..tostring(epochs)..",lr:"..lr..",PPL:"..erate)
+		erate=sumErr/ieps
 		table.insert(crithis,erate)
-		if erate<minerrate and erate~=0 then
-			print("new minimal error found,save model")
+		edevrate=evaDev(nnmod,devin,devt,critmod)
+		table.insert(cridev,edevrate)
+		print("epoch:"..tostring(epochs)..",lr:"..lr..",Tra:"..erate..",Dev:"..edevrate)
+		modsavd=false
+		if edevrate<mindeverrate then
+			print("new minimal dev error found,save model")
+			mindeverrate=edevrate
+			saveObject("winrs/devnnmod"..storedevmini..".asc",nnmod)
+			storedevmini=storedevmini+1
+			modsavd=true
+		end
+		if erate<minerrate then
 			minerrate=erate
-			saveObject("winrs/nnmod"..storemini..".asc",nnmod)
-			storemini=storemini+1
 			aminerr=0
+			if not modsavd then
+				print("new minimal error found,save model")
+				saveObject("winrs/nnmod"..storemini..".asc",nnmod)
+				storemini=storemini+1
+			end
 		else
 			if aminerr>=4 then
 				aminerr=0
@@ -246,20 +305,26 @@ while true do
 	print("save criterion history trained")
 	critensor=torch.Tensor(crithis)
 	saveObject("winrs/crit.asc",critensor)
+	critdev=torch.Tensor(cridev)
+	saveObject("winrs/critdev.asc",critdev)
 
 	print("plot and save criterion")
 	gnuplot.plot(critensor)
 	gnuplot.figprint("winrs/crit.png")
 	gnuplot.figprint("winrs/crit.eps")
 	gnuplot.plotflush()
+	gnuplot.plot(critdev)
+	gnuplot.figprint("winrs/critdev.png")
+	gnuplot.figprint("winrs/critdev.eps")
+	gnuplot.plotflush()
 
 	print("task finished!Minimal error rate:"..minerrate)
-
-	print("collect garbage")
-	collectgarbage()
 
 	print("wait for test, neural network saved at nnmod*.asc")
 
 	icycle=icycle+1
+
+	print("collect garbage")
+	collectgarbage()
 
 end
