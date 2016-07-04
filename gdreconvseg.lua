@@ -316,7 +316,7 @@ while true do
 		if edevrate<mindeverrate then
 			print("new minimal dev error found,save model")
 			mindeverrate=edevrate
-			saveObject("dreconvrs/devnnmod"..storedevmini..".asc",nnmod)
+			saveObject("gdreconvrs/devnnmod"..storedevmini..".asc",nnmod)
 			storedevmini=storedevmini+1
 			modsavd=true
 		end
@@ -325,7 +325,7 @@ while true do
 			aminerr=0
 			if not modsavd then
 				print("new minimal error found,save model")
-				saveObject("dreconvrs/nnmod"..storemini..".asc",nnmod)
+				saveObject("gdreconvrs/nnmod"..storemini..".asc",nnmod)
 				storemini=storemini+1
 			end
 		else
@@ -341,22 +341,22 @@ while true do
 	end
 
 	print("save neural network trained")
-	saveObject("dreconvrs/nnmod.asc",nnmod)
+	saveObject("gdreconvrs/nnmod.asc",nnmod)
 
 	print("save criterion history trained")
 	critensor=torch.Tensor(crithis)
-	saveObject("dreconvrs/crit.asc",critensor)
+	saveObject("gdreconvrs/crit.asc",critensor)
 	critdev=torch.Tensor(cridev)
-	saveObject("dreconvrs/critdev.asc",critdev)
+	saveObject("gdreconvrs/critdev.asc",critdev)
 
 	print("plot and save criterion")
 	gnuplot.plot(critensor)
-	gnuplot.figprint("dreconvrs/crit.png")
-	gnuplot.figprint("dreconvrs/crit.eps")
+	gnuplot.figprint("gdreconvrs/crit.png")
+	gnuplot.figprint("gdreconvrs/crit.eps")
 	gnuplot.plotflush()
 	gnuplot.plot(critdev)
-	gnuplot.figprint("dreconvrs/critdev.png")
-	gnuplot.figprint("dreconvrs/critdev.eps")
+	gnuplot.figprint("gdreconvrs/critdev.png")
+	gnuplot.figprint("gdreconvrs/critdev.eps")
 	gnuplot.plotflush()
 
 	print("task finished!Minimal error rate:"..minerrate)
