@@ -208,18 +208,18 @@ function getnn()
 	local nnmodinput=nn.Sequential()
 		:add(nn.vecLookup(wvec))
 		:add(nn.Reshape(isize,true))
-	local nnmodcore=graphmodule(nn.Sequential()
+	local nnmodcore=nn.Sequential()
 		:add(nn.Linear(isize,hsize))
 		:add(nn.Tanh())
 	--	:add(nn.Linear(hsize,hfsize))
 	--	:add(nn.Tanh())
 	--	:add(nn.Linear(hfsize,1))
 		:add(nn.Linear(hsize,1))
-		:add(nn.Sigmoid()))
+	--	:add(nn.Sigmoid())
 
 	local nnmod=nn.Sequential()
 		:add(nnmodinput)
-		:add(nnmodcore)
+		:add(graphmodule(nnmodcore))
 	return nnmod
 end
 
