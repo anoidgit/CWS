@@ -92,23 +92,14 @@ function easytarseq(seqin)
 	local rst={}
 	local i=1
 	for i=1,#seqin do
-		table.remove(seqin[i],1)
-		table.insert(rst,seqin[i])
+		local tmpt={}
+		local tmpts=seqin[i]
+		for j=2,#tmpts do
+			table.insert(tmpt,torch.Tensor({tmpts[j]}))
+		end
+		table.insert(rst,tmpt)
 	end
 	return rst
-end
-
-function fillsamplecache()
-	while #samicache<cachesize do
-		local sid=torch.random(1,nsam)
-		local seqex=trainseq[sid]
-		for i=0,#seqex-winsize do
-			table.insert(samicache,{table.unpack(seqex,i+1,i+winsize)})
-		end
-		for _,v in ipairs(tarseq[sid]) do
-			table.insert(samtcache,v)
-		end
-	end
 end
 
 function getsample()
@@ -118,7 +109,7 @@ function getsample()
 	else
 		curpot=1
 	end
-	local seqex=trainseq[sid]
+	local seqex=trainseq[seqid]
 	local tinp={}
 	for i=0,#seqex-winsize do
 		table.insert(tinp,torch.Tensor({table.unpack(seqex,i+1,i+winsize)}))
@@ -160,7 +151,6 @@ end
 
 print("load settings")
 winsize=7
-batchsize=1024
 modlr=0.5
 
 print("load vectors")
@@ -214,7 +204,7 @@ function getnn()
 	local isize=sizvec*winsize
 	local picsize=picdepth*picheight*picwidth
 	local mtsize=math.floor((isize+picsize)/2)
-	local cosize=nifilter2*(picheight-2-2-2)*(picwidth-2-2-2)/2
+	local cosize=nifilter2*(picheight-2-2-2)*(picwidth-2-2-2)
 	local hcosize=math.floor(cosize/2)
 
 	-- use ELU or residue-tanh? It is a problem, ELU runs faster now, but may have problems
@@ -223,14 +213,14 @@ function getnn()
 
 	local nnmodinput=nn.Sequential()
 		:add(nn.vecLookup(wvec))
-		:add(nn.Reshape(isize,true))
-
-	local nnmodcore=nn.Sequential()
+		:add(nn.Reshape(isize))
 		:add(nn.Linear(isize,mtsize))
 		:add(actfunc:clone())
 		:add(nn.Linear(mtsize,picsize))
 		:add(actfunc:clone())
-		:add(nn.Reshape(picdepth,picheight,picwidth,true))
+		:add(nn.Reshape(picdepth,picheight,picwidth))
+
+	local nnmodcore=nn.Sequential()
 		:add(nn.SpatialConvolution(picdepth, nifilter, 3, 1))
 		:add(actfunc:clone())
 		:add(nn.SpatialConvolution(nifilter, nifilter2, 1, 3))
@@ -250,17 +240,11 @@ function getnn()
 		:add(nn.SpatialConvolution(nifilter2, nifilter, 1, 1))
 		:add(actfunc:clone())
 		:add(nn.SpatialConvolution(nifilter, nifilter2, 1, 3))
-		:add(nn.Convert('bchw','bf'))
+		:add(nn.Reshape(cosize))
 
-	local GConvnn=nn.BiSequencer(nn.ConvGRU(winsize, cosize, nn.Sequential():add(nnmodinput):add(nnmodcore)))
+	local GConvnn=nn.ConvGRU(winsize, cosize, nn.Sequential():add(nnmodinput):add(nnmodcore))
 
-	local outputmodru=nn.Recurrent(hcosize,nn.Linear(cosize,hcosize),nn.Linear(hcosize,hcosize))
-
-	local outputmodu=nn.Sequential():add(outputmodru):add(nn.Tanh()):add(nn.Linear(hcosize,1))
-
-	local outputmod=nn.BiSequencer(outputmodu)
-
-	local nnmod=nn.Sequential():add(GConvnn):add(outputmod)
+	local nnmod=nn.BiSequencer(nn.Sequential():add(GConvnn):add(nn.Linear(cosize,hcosize)):add(nn.Tanh()):add(nn.Linear(hcosize,1)),nil,nn.CAddTable())
 
 	return nnmod
 end
@@ -270,7 +254,7 @@ nnmod=getnn()
 print(nnmod)
 
 print("design criterion")
-critmod = nn.MarginCriterion()
+critmod = nn.SequencerCriterion(nn.MarginCriterion())
 --if use the BCECriterion below, uncomment the Sigmoid activation funcition in getnn(), use another target dataset who is commented now where -1 is replaced by 0 for BCECriterion and Sigmoid.
 --critmod = nn.BCECriterion()
 
@@ -282,7 +266,7 @@ collectgarbage()
 print("start pre train")
 for tmpi=1,32 do
 	for tmpi=1,ieps do
-		input,target=getsamples(batchsize)
+		input,target=getsample()
 		gradUpdate(nnmod,input,target,critmod,lr)
 	end
 	erate=sumErr/ieps
@@ -305,7 +289,7 @@ while true do
 	print("start innercycle:"..icycle)
 	for innercycle=1,256 do
 		for tmpi=1,ieps do
-			input,target=getsamples(batchsize)
+			input,target=getsample()
 			gradUpdate(nnmod,input,target,critmod,lr)
 		end
 		erate=sumErr/ieps
