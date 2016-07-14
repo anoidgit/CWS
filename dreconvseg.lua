@@ -289,6 +289,7 @@ print("init train")
 epochs=1
 lr=modlr
 collectgarbage()
+
 print("start pre train")
 for tmpi=1,32 do
 	for tmpi=1,ieps do
