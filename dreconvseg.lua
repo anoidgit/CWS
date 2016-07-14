@@ -16,7 +16,18 @@ end
 function evaDev(mlpin, x, y, criterionin)
 	local tmod=mlpin:clone()
 	tmod:evaluate()
-	return criterionin:forward(tmod:forward(x), y)
+	local ind=1
+	local serr=0
+	local eind=x:size(1)
+	local cfwd=1
+	while ind+4096<eind do
+		serr=serr+criterionin:forward(tmod:forward(x:narrow(1,ind,4096)), y:narrow(1,ind,4096))
+		ind=ind+4096
+		cfwd=cfwd+1
+	end
+	local exlen=eind-ind+1
+	serr=serr+criterionin:forward(tmod:forward(x:narrow(1,ind,exlen)), y:narrow(1,ind,exlen))
+	return serr/cfwd
 end
 
 function getresmodel(modelcap,scale,usegraph)
@@ -155,8 +166,8 @@ function saveObject(fname,objWrt)
 end
 
 print("load settings")
-winsize=7
-batchsize=1024
+winsize=9
+batchsize=4096
 ieps=256
 modlr=0.5
 
@@ -204,15 +215,17 @@ print("design neural networks")
 function getnn()
 	local picwidth=7
 	local picheight=7
-	local picdepth=4
-	local nifilter=16
+	local picdepth=16
+	local nifilter=32
 
 	local nifilter2=nifilter*2
+	local nifilter4=nifilter2*2
+	local nifilter8=nifilter4*2
 
 	local isize=sizvec*winsize
 	local picsize=picdepth*picheight*picwidth
 	local mtsize=math.floor((isize+picsize)/2)
-	local cosize=nifilter2*(picheight-2-2-2)*(picwidth-2-2-2)
+	local cosize=nifilter4*(picheight-2*3)*(picwidth-2*3)
 
 	-- use ELU or residue-tanh? It is a problem, ELU runs faster now, but may have problems
 	--local actfunc=nn.ELU()
@@ -236,17 +249,16 @@ function getnn()
 		:add(actfunc:clone())
 		:add(nn.SpatialConvolution(nifilter, nifilter2, 3, 1))
 		:add(actfunc:clone())
-		:add(nn.SpatialConvolution(nifilter2, nifilter, 1, 1))
+		:add(nn.SpatialConvolution(nifilter2, nifilter4, 1, 3))
 		:add(actfunc:clone())
-		:add(nn.SpatialConvolution(nifilter, nifilter2, 1, 3))
+		:add(nn.SpatialConvolution(nifilter4, nifilter2, 1, 1))
 		:add(actfunc:clone())
-		:add(nn.SpatialConvolution(nifilter2, nifilter, 1, 1))
+		:add(nn.SpatialConvolution(nifilter2, nifilter4, 3, 1))
 		:add(actfunc:clone())
-		:add(nn.SpatialConvolution(nifilter, nifilter2, 3, 1))
+		:add(nn.SpatialConvolution(nifilter4, nifilter8, 1, 3))
 		:add(actfunc:clone())
-		:add(nn.SpatialConvolution(nifilter2, nifilter, 1, 1))
+		:add(nn.SpatialConvolution(nifilter8, nifilter4, 1, 1))
 		:add(actfunc:clone())
-		:add(nn.SpatialConvolution(nifilter, nifilter2, 1, 3))
 
 	local nnmodoutput=nn.Sequential()
 		:add(nn.Convert('bchw','bf'))
@@ -277,7 +289,7 @@ print("init train")
 epochs=1
 lr=modlr
 collectgarbage()
-
+print(evaDev(nnmod,devin,devt,critmod))
 print("start pre train")
 for tmpi=1,32 do
 	for tmpi=1,ieps do
